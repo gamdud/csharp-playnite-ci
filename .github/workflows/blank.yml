@@ -31,13 +31,14 @@ jobs:
           $csFile = "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.cs"
           $content = Get-Content $csFile -Raw
           if ($content -notmatch "using System.Net.Http;") {
-              # Insert after the last using directive. Here we target 'using System.Text.RegularExpressions;'
+              # Use regex to insert the missing using directive after "using System.Text.RegularExpressions;"
               $pattern = '(using System\.Text\.RegularExpressions;)'
-              $replacement = '$1`nusing System.Net.Http;'
+              $replacement = '${1}' + [System.Environment]::NewLine + 'using System.Net.Http;'
               $content = [regex]::Replace($content, $pattern, $replacement)
               Set-Content $csFile -Value $content
           }
           Write-Host "Inserted using System.Net.Http; directive if not present."
+
       
       # Build the project (default build target).
       - name: Build Playnite Extension
