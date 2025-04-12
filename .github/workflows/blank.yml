@@ -32,7 +32,7 @@ jobs:
 
       # Upload the generated .pext file as an artifact.
       - name: Upload Playnite Extension Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: PC_GAMES_Local.pext
           path: "Playnite Addons/PC_GAMES_Local/bin/Release/PC_GAMES_Local.pext"
