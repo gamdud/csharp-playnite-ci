@@ -64,15 +64,39 @@ jobs:
         working-directory: "Playnite Addons/PC_GAMES_Local"
 
       # Package the extension by zipping the required files and renaming the zip as .pext.
-      - name: Package Playnite Extension
+      # Package the extension properly by flattening the structure.
+      - name: Package the extension properly
         shell: pwsh
         run: |
+          # Define paths
           $outputFile = "bin/Release/PC_GAMES_Local.pext"
+          $packageFolder = "package_temp"
+          
+          # Remove the temporary package folder if it already exists.
+          if (Test-Path $packageFolder) { Remove-Item $packageFolder -Recurse -Force }
+          
+          # Create a new temporary package folder.
+          New-Item -ItemType Directory -Path $packageFolder | Out-Null
+          
+          # Copy required files to the temporary package folder.
+          # The extension manifest and icon must be at the root,
+          # along with the plugin assembly (e.g., PC_GAMES_Local.dll).
+          Copy-Item "extension.yaml" -Destination $packageFolder
+          Copy-Item "icon.png" -Destination $packageFolder
+          Copy-Item "bin/Release/PC_GAMES_Local.dll" -Destination $packageFolder
+          
+          # Remove the output package file if it exists.
           if (Test-Path $outputFile) { Remove-Item $outputFile }
-          # Specify the files to include: the manifest, icon, and everything in bin/Release.
-          $filesToInclude = @("extension.yaml", "icon.png", "bin/Release/*")
-          Compress-Archive -Path $filesToInclude -DestinationPath $outputFile -Force
+          
+          # Compress the contents of the package folder into a .pext file.
+          Compress-Archive -Path "$packageFolder/*" -DestinationPath $outputFile -Force
+          
+          # Optionally, remove the temporary package folder.
+          Remove-Item $packageFolder -Recurse -Force
+          
+          Write-Host "Packaged extension is at $outputFile"
         working-directory: "Playnite Addons/PC_GAMES_Local"
+
       
       # Upload the generated .pext file as an artifact.
       - name: Upload Playnite Extension Artifact
