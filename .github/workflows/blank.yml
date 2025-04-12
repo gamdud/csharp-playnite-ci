@@ -38,14 +38,20 @@ jobs:
               Set-Content $csFile -Value $content
           }
           Write-Host "Inserted using System.Net.Http; directive if not present."
-      
+
       # Update the Path assignment in the CS file to use Remove instead of Replace.
       - name: Update Path assignment in CS file
         shell: pwsh
         run: |
           $csFile = "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.cs"
-          $oldLine = 'Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Replace(gameName, "").TrimStart(\'\\\')}",'
-          $newLine = 'Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Remove(GetRelativePath(folder, exe).IndexOf(gameName), gameName.Length).TrimStart(\'\\\')}",'
+
+          $oldLine = @'
+          Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Replace(gameName, "").TrimStart('\\')}",'@
+
+          $newLine = @'
+          Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Remove(GetRelativePath(folder, exe).IndexOf(gameName), gameName.Length).TrimStart('\\')}",
+          '@
+
           $content = Get-Content $csFile -Raw
           $updated = $content.Replace($oldLine, $newLine)
           Set-Content $csFile -Value $updated
