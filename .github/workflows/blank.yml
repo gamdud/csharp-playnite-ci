@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Checkout the repository at the specified commit.
+      # Checkout repository at the specified commit.
       - name: Checkout repository at commit 50ed2ef2bebd07f3635fd4c4e003980513154f2f
         uses: actions/checkout@v4
         with:
@@ -24,28 +24,43 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.sln"
 
-      # Build the Playnite extension project.
+      # Patch build files to inject missing using (without editing existing source files)
+      - name: Inject GlobalUsings to fix HttpClient error
+        shell: pwsh
+        run: |
+          $targetDir = "Playnite Addons/PC_GAMES_Local"
+          
+          # Create a Directory.Build.targets file to include GlobalUsings.cs
+          $dirTargetsPath = Join-Path $targetDir "Directory.Build.targets"
+          @"
+<Project>
+  <ItemGroup>
+    <Compile Include="GlobalUsings.cs" />
+  </ItemGroup>
+</Project>
+"@ | Out-File -FilePath $dirTargetsPath -Encoding utf8
+          
+          # Create GlobalUsings.cs with the global using directive for System.Net.Http
+          $globalUsingsPath = Join-Path $targetDir "GlobalUsings.cs"
+          @"
+global using System.Net.Http;
+"@ | Out-File -FilePath $globalUsingsPath -Encoding utf8
+
+      # Build the Playnite extension project (force C# 10 for global usings)
       - name: Build Playnite Extension
-        run: msbuild "PC_GAMES_Local.csproj" /p:Configuration=Release
+        run: msbuild "PC_GAMES_Local.csproj" /p:Configuration=Release /p:LangVersion=10
         working-directory: "Playnite Addons/PC_GAMES_Local"
 
-      # Manually package the extension by zipping the necessary files.
+      # Package the extension into a .pext by zipping the required files.
       - name: Package Playnite Extension
         shell: pwsh
         run: |
-          # Set the package output path.
           $packagePath = "bin/Release/PC_GAMES_Local.pext"
           if (Test-Path $packagePath) { Remove-Item $packagePath }
           
-          # Choose the files to package. Typically, a Playnite extension needs:
-          # - extension.yaml (the manifest)
-          # - icon.png (the icon)
-          # - the compiled binaries from bin/Release (e.g., PC_GAMES_Local.dll)
-          #
-          # Adjust the list below if you want to include/exclude files.
+          # Define the files/folders needed for the Playnite extension.
           $filesToInclude = @("extension.yaml", "icon.png", "bin/Release/*")
           
-          # Create a ZIP archive and output it as a .pext file.
           Compress-Archive -Path $filesToInclude -DestinationPath $packagePath -Force
         working-directory: "Playnite Addons/PC_GAMES_Local"
 
