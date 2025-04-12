@@ -1,6 +1,5 @@
 name: Build Playnite Extension
 
-# Trigger this workflow manually
 on:
   workflow_dispatch:
 
@@ -9,7 +8,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Check out the repository at the specified commit.
+      # Checkout the repository at the specified commit.
       - name: Checkout repository at commit 50ed2ef2bebd07f3635fd4c4e003980513154f2f
         uses: actions/checkout@v4
         with:
@@ -17,20 +16,40 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: 50ed2ef2bebd07f3635fd4c4e003980513154f2f
 
-      # Ensure MSBuild is in the PATH.
+      # Setup MSBuild on the Windows runner.
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1
 
-      # Restore NuGet packages for the solution.
+      # Restore NuGet packages.
       - name: Restore NuGet packages
         run: nuget restore "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.sln"
 
-      # Build and package the Playnite extension.
-      - name: Build and Package Playnite Extension
-        run: msbuild "PC_GAMES_Local.csproj" /t:Package /p:Configuration=Release
+      # Build the Playnite extension project.
+      - name: Build Playnite Extension
+        run: msbuild "PC_GAMES_Local.csproj" /p:Configuration=Release
         working-directory: "Playnite Addons/PC_GAMES_Local"
 
-      # Upload the generated .pext file as an artifact.
+      # Manually package the extension by zipping the necessary files.
+      - name: Package Playnite Extension
+        shell: pwsh
+        run: |
+          # Set the package output path.
+          $packagePath = "bin/Release/PC_GAMES_Local.pext"
+          if (Test-Path $packagePath) { Remove-Item $packagePath }
+          
+          # Choose the files to package. Typically, a Playnite extension needs:
+          # - extension.yaml (the manifest)
+          # - icon.png (the icon)
+          # - the compiled binaries from bin/Release (e.g., PC_GAMES_Local.dll)
+          #
+          # Adjust the list below if you want to include/exclude files.
+          $filesToInclude = @("extension.yaml", "icon.png", "bin/Release/*")
+          
+          # Create a ZIP archive and output it as a .pext file.
+          Compress-Archive -Path $filesToInclude -DestinationPath $packagePath -Force
+        working-directory: "Playnite Addons/PC_GAMES_Local"
+
+      # Upload the resulting .pext file as an artifact.
       - name: Upload Playnite Extension Artifact
         uses: actions/upload-artifact@v4
         with:
