@@ -43,33 +43,47 @@ jobs:
         shell: pwsh
         run: |
           $csFile = "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.cs"
-          
+
           # Define the exact text to find and its replacement.
           $oldLine = 'Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Replace(gameName, "").TrimStart(''\\'')}",'
           $newLine = 'Path = $"{{InstallDir}}\\{GetRelativePath(folder, exe).Remove(GetRelativePath(folder, exe).IndexOf(gameName), gameName.Length).TrimStart(''\\'')}",'
-          
+
           # Read the file content.
           $content = Get-Content $csFile -Raw
-          
+
+          # Count occurrences of the old line in the original content.
+          $oldCountOrig = ($content -split [regex]::Escape($oldLine)).Length - 1
+          if ($oldCountOrig -eq 0) {
+              Write-Host "Old line was not detected in the file initially."
+          }
+          else {
+              Write-Host "Old line detected $oldCountOrig time(s) in the file."
+          }
+
           # Perform the replacement.
           $updated = $content.Replace($oldLine, $newLine)
-          
+
           # Count occurrences of the old line in the updated content.
-          $oldCount = ($updated -split [regex]::Escape($oldLine)).Length - 1
-          
-          if ($oldCount -eq 0) {
-              Write-Host "Verification: The file was successfully patched. No occurrences of the old line were found."
-          } else {
-              Write-Host "Verification: Patch incomplete. The old line still exists ($oldCount occurrence(s) found)."
+          $oldCountAfter = ($updated -split [regex]::Escape($oldLine)).Length - 1
+
+          if (($oldCountAfter -eq 0) -and ($oldCountOrig -gt 0)) {
+              Write-Host "Verification: The file was successfully patched. No occurrences of the old line remain."
           }
-          
+          elseif ($oldCountOrig -eq 0) {
+              Write-Host "Verification: No replacement was needed as the old line was not present initially."
+          }
+          else {
+              Write-Host "Verification: Patch incomplete. The old line still exists ($oldCountAfter occurrence(s) found)."
+          }
+
           # Optionally, print a snippet showing all lines starting with 'Path ='
           Write-Host "Updated file snippet (lines starting with 'Path ='):"
           $snippet = $updated.Split("`n") | Where-Object { $_ -like "Path = *" }
-          Write-Host $snippet
-          
+          Write-Host ($snippet -join "`n")
+
           # Write the updated content back to the file.
           Set-Content $csFile -Value $updated
+
 
 
 
