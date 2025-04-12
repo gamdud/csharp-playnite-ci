@@ -16,7 +16,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: 50ed2ef2bebd07f3635fd4c4e003980513154f2f
 
-      # Setup MSBuild on the Windows runner.
+      # Setup MSBuild so that msbuild is available.
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v1
 
@@ -24,47 +24,38 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.sln"
 
-      # Patch build files to inject missing using (without editing existing source files)
-      - name: Inject GlobalUsings to fix HttpClient error
+      # Insert the missing HttpClient using directive (cheeky "sed") without permanently editing the repo.
+      - name: Insert missing HttpClient using directive
         shell: pwsh
         run: |
-          $targetDir = "Playnite Addons/PC_GAMES_Local"
-          
-          # Create a Directory.Build.targets file to include GlobalUsings.cs
-          $dirTargetsPath = Join-Path $targetDir "Directory.Build.targets"
-          @"
-<Project>
-  <ItemGroup>
-    <Compile Include="GlobalUsings.cs" />
-  </ItemGroup>
-</Project>
-"@ | Out-File -FilePath $dirTargetsPath -Encoding utf8
-          
-          # Create GlobalUsings.cs with the global using directive for System.Net.Http
-          $globalUsingsPath = Join-Path $targetDir "GlobalUsings.cs"
-          @"
-global using System.Net.Http;
-"@ | Out-File -FilePath $globalUsingsPath -Encoding utf8
-
-      # Build the Playnite extension project (force C# 10 for global usings)
+          $csFile = "Playnite Addons/PC_GAMES_Local/PC_GAMES_Local.cs"
+          $content = Get-Content $csFile -Raw
+          if ($content -notmatch "using System.Net.Http;") {
+              # Insert after the last using directive. Here we target 'using System.Text.RegularExpressions;'
+              $pattern = '(using System\.Text\.RegularExpressions;)'
+              $replacement = '$1`nusing System.Net.Http;'
+              $content = [regex]::Replace($content, $pattern, $replacement)
+              Set-Content $csFile -Value $content
+          }
+          Write-Host "Inserted using System.Net.Http; directive if not present."
+      
+      # Build the project (default build target).
       - name: Build Playnite Extension
-        run: msbuild "PC_GAMES_Local.csproj" /p:Configuration=Release /p:LangVersion=10
+        run: msbuild "PC_GAMES_Local.csproj" /p:Configuration=Release
         working-directory: "Playnite Addons/PC_GAMES_Local"
 
-      # Package the extension into a .pext by zipping the required files.
+      # Package the extension by zipping the required files and renaming the zip as .pext.
       - name: Package Playnite Extension
         shell: pwsh
         run: |
-          $packagePath = "bin/Release/PC_GAMES_Local.pext"
-          if (Test-Path $packagePath) { Remove-Item $packagePath }
-          
-          # Define the files/folders needed for the Playnite extension.
+          $outputFile = "bin/Release/PC_GAMES_Local.pext"
+          if (Test-Path $outputFile) { Remove-Item $outputFile }
+          # Specify the files to include: the manifest, icon, and everything in bin/Release.
           $filesToInclude = @("extension.yaml", "icon.png", "bin/Release/*")
-          
-          Compress-Archive -Path $filesToInclude -DestinationPath $packagePath -Force
+          Compress-Archive -Path $filesToInclude -DestinationPath $outputFile -Force
         working-directory: "Playnite Addons/PC_GAMES_Local"
-
-      # Upload the resulting .pext file as an artifact.
+      
+      # Upload the generated .pext file as an artifact.
       - name: Upload Playnite Extension Artifact
         uses: actions/upload-artifact@v4
         with:
